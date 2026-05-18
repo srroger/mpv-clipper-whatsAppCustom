@@ -91,8 +91,22 @@ local function make_clip()
         table.insert(args, "-c:v"); table.insert(args, "copy")
     else
         table.insert(args, "-c:v"); table.insert(args, p.video_codec)
-        if p.crf ~= "" then table.insert(args, "-crf"); table.insert(args, p.crf) end
-        if p.preset ~= "" then table.insert(args, "-preset"); table.insert(args, p.preset) end
+        if config.quality == "custom" then
+            table.insert(args, "-profile:v")
+            table.insert(args, "baseline")
+
+            table.insert(args, "-level")
+            table.insert(args, "3.0")
+
+            table.insert(args, "-pix_fmt")
+            table.insert(args, "yuv420p")
+
+            table.insert(args, "-ac")
+            table.insert(args, "2")
+        end
+
+        if p.crf ~= "" then table.insert(args, "-crf"); table.insert(args, tostring(p.crf)) end
+        if p.preset ~= "" then table.insert(args, "-preset"); table.insert(args, tostring(p.preset)) end
     end
 
     if p.audio_codec == "copy" then
@@ -100,7 +114,7 @@ local function make_clip()
     else
         table.insert(args, "-c:a"); table.insert(args, p.audio_codec)
         if p.audio_bitrate and p.audio_bitrate ~= "" then
-            table.insert(args, "-b:a"); table.insert(args, p.audio_bitrate)
+            table.insert(args, "-b:a"); table.insert(args, tostring(p.audio_bitrate))
         end
     end
 
@@ -111,6 +125,8 @@ local function make_clip()
     table.insert(args, out_path)
 
     if config.show_logs then msg.info("Running:", table.concat(args, " ")) end
+    msg.info("OUT:", out_path)
+    msg.info("ARGS:", utils.to_string(args))
     mp.command_native_async({ name = "subprocess", args = args, capture_stdout = true, capture_stderr = true }, function() end)
     mp.osd_message("Clip saved: " .. out_path, config.osd_duration)
 end
