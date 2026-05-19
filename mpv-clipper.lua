@@ -85,7 +85,7 @@ local function make_clip()
     local out_path = utils.join_path(out_dir, name:gsub("%..+$", "") .. config.clip_suffix .. ext)
 
     local p = get_active_preset()
-    local args = { "ffmpeg", "-y", "-ss", tostring(start_time), "-i", file, "-t", tostring(duration) }
+    local args = { "ffmpeg", "-y", "-i", file, "-ss", tostring(start_time), "-t", tostring(duration) }
 
     if p.video_codec == "copy" then
         table.insert(args, "-c:v"); table.insert(args, "copy")
