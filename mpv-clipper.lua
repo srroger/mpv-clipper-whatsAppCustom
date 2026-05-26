@@ -82,11 +82,32 @@ local function make_clip()
     local dir, name = utils.split_path(file)
     local out_dir = (config.output_dir ~= "" and config.output_dir) or dir
     local ext = (config.container == "auto") and file:match("^.+(%..+)$") or ("."..config.container)
-    local out_path = utils.join_path(out_dir, name:gsub("%..+$", "") .. config.clip_suffix .. ext)
+    -- Timestamp
+    local timestamp = os.date("%Y%m%d-%H%M%S")
+    local out_path = utils.join_path(out_dir, name:gsub("%..+$", "") .. config.clip_suffix .. "-" .. timestamp .. ext)
 
     local p = get_active_preset()
+
     local args = { "ffmpeg", "-y", "-i", file, "-ss", tostring(start_time), "-t", tostring(duration) }
 
+    -- Explicit stream mapping
+    table.insert(args, "-map")
+    table.insert(args, "0:v:0")
+
+    -- Current selected tracks in mpv
+    local audio_id = mp.get_property_number("current-tracks/audio/id")
+    if audio_id then
+        table.insert(args, "-map")
+        table.insert(args, "0:a:" .. (audio_id - 1))
+    end
+
+    local sub_id = mp.get_property_number("current-tracks/sub/id")
+    if sub_id and config.container=="mkv" then
+        table.insert(args, "-map")
+        table.insert(args, "0:s:" .. (sub_id - 1))
+    end
+
+    -- Video codec
     if p.video_codec == "copy" then
         table.insert(args, "-c:v"); table.insert(args, "copy")
     else
@@ -118,6 +139,13 @@ local function make_clip()
         end
     end
 
+    -- Subtitle handling
+    if sub_id and config.container=="mkv" then
+        table.insert(args, "-c:s")
+        table.insert(args, "copy")
+    end
+
+    -- Scaling
     if p.scale and p.scale ~= "" then
         table.insert(args, "-vf"); table.insert(args, "scale="..p.scale)
     end
@@ -127,7 +155,27 @@ local function make_clip()
     if config.show_logs then msg.info("Running:", table.concat(args, " ")) end
     msg.info("OUT:", out_path)
     msg.info("ARGS:", utils.to_string(args))
-    mp.command_native_async({ name = "subprocess", args = args, capture_stdout = true, capture_stderr = true }, function() end)
+    msg.info("COMMAND: " .. table.concat(args, " "))
+    mp.command_native_async(
+    {
+        name = "subprocess",
+        args = args,
+        capture_stdout = true,
+        capture_stderr = true
+    },
+    function(success, result, err)
+        msg.info("FFmpeg finished")
+
+        if result then
+            msg.info("STATUS: " .. tostring(result.status))
+            msg.info("STDOUT: " .. tostring(result.stdout))
+            msg.info("STDERR: " .. tostring(result.stderr))
+        end
+
+        if err then
+            msg.error("ERROR: " .. tostring(err))
+        end
+    end)
     mp.osd_message("Clip saved: " .. out_path, config.osd_duration)
 end
 
